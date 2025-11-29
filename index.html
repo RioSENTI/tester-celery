@@ -90,20 +90,21 @@ button:hover { background: #2b5876; }
 <!-- DOWNLOAD -->
 <div class="container" id="downloadBox" style="display:none;">
     <h2>Welcome!</h2>
-    <p style="text-align:center;">You're logged in.</p>
+    <p style="text-align:center;" id="welcomeMsg">You're logged in.</p>
     <button onclick="downloadFile()">Download celery.zip</button>
     <div class="link" onclick="logout()">Log Out</div>
     <div class="link" onclick="openAdminPanel()" id="adminLink" style="display:none; margin-top:20px;">🔐 Open Admin Panel</div>
 </div>
 
 <!-- ADMIN PANEL -->
-<div class="container" id="adminBox" style="display:none; width:600px;">
+<div class="container" id="adminBox" style="display:none; width:650px;">
     <h2>Admin Panel</h2>
     <p style="text-align:center;">Manage Registered Users Below</p>
     <table class="adminTable" id="adminTable">
         <tr><th>Username</th><th>Password Hash</th><th>Actions</th></tr>
     </table>
     <button style="background:#8e44ad; color:white; margin-top:10px;" onclick="openInviteManager()">Manage Invite Keys</button>
+    <div id="loginAttemptsPanel"></div>
     <button style="background:#333; margin-top:12px;" onclick="closeAdminPanel()">Close Admin Panel</button>
 </div>
 
@@ -158,6 +159,17 @@ async function hash(text){
     return [...new Uint8Array(buf)].map(x=>x.toString(16).padStart(2,"0")).join("");
 }
 
+// --- Track login attempts ---
+function logLoginAttempt(username, success){
+    let attempts = JSON.parse(localStorage.getItem("login_attempts")||"[]");
+    attempts.push({
+        username: username,
+        success: success,
+        time: new Date().toLocaleString()
+    });
+    localStorage.setItem("login_attempts", JSON.stringify(attempts));
+}
+
 // --- Register ---
 document.getElementById("regBtn").addEventListener("click", async ()=>{
     const user=document.getElementById("regUser").value.trim();
@@ -172,7 +184,7 @@ document.getElementById("regBtn").addEventListener("click", async ()=>{
     localStorage.setItem("invite_user_"+key,user);
     usedInvites.push(key); localStorage.setItem("used_invites",JSON.stringify(usedInvites));
     VALID_KEYS = VALID_KEYS.filter(k=>k!==key);
-    localStorage.setItem("VALID_KEYS", JSON.stringify(VALID_KEYS)); // persist
+    localStorage.setItem("VALID_KEYS", JSON.stringify(VALID_KEYS));
     regMsg.className="success"; regMsg.innerHTML="Account created! Redirecting...";
     setTimeout(showLogin,1200);
 });
@@ -184,15 +196,17 @@ document.getElementById("logBtn").addEventListener("click", async () => {
     logMsg.innerHTML=""; logMsg.className="";
     if(!user||!pass){logMsg.className="error"; logMsg.innerHTML="Enter username and password."; return;}
     const storedHash=localStorage.getItem("user_"+user);
-    if(!storedHash){logMsg.className="error"; logMsg.innerHTML="Incorrect username or password."; return;}
+    if(!storedHash){logLoginAttempt(user,false); logMsg.className="error"; logMsg.innerHTML="Incorrect username or password."; return;}
     const inputHash=await hash(pass);
-    if(inputHash!==storedHash){logMsg.className="error"; logMsg.innerHTML="Incorrect username or password."; return;}
+    if(inputHash!==storedHash){logLoginAttempt(user,false); logMsg.className="error"; logMsg.innerHTML="Incorrect username or password."; return;}
+    logLoginAttempt(user,true);
     localStorage.setItem("loggedInUser",user);
     logMsg.className="success"; logMsg.innerHTML="Login successful!";
     setTimeout(()=>{
         loginBox.style.display="none";
         downloadBox.style.display="block";
         adminLink.style.display = ADMINS.includes(user)?"block":"none";
+        document.getElementById("welcomeMsg").innerText = "Welcome, " + user + "!";
     },300);
 });
 
@@ -204,6 +218,7 @@ window.onload = ()=>{
         loginBox.style.display="none";
         downloadBox.style.display="block";
         adminLink.style.display=ADMINS.includes(user)?"block":"none";
+        document.getElementById("welcomeMsg").innerText = "Welcome, " + user + "!";
     }
 };
 
@@ -219,6 +234,7 @@ function openAdminPanel(){
     if(!ADMINS.includes(user)) return alert("Access denied.");
     adminBox.style.display="block"; downloadBox.style.display="none";
     loadAdminTable();
+    loadLoginAttempts();
 }
 function closeAdminPanel(){adminBox.style.display="none"; downloadBox.style.display="block";}
 function loadAdminTable(){
@@ -296,7 +312,7 @@ function generateNewKeys(){
         const k=generateRandomKey();
         VALID_KEYS.push(k);
     }
-    localStorage.setItem("VALID_KEYS", JSON.stringify(VALID_KEYS)); // persist new keys
+    localStorage.setItem("VALID_KEYS", JSON.stringify(VALID_KEYS));
     loadInviteTable();
     alert(count+" new keys generated!");
 }
@@ -325,6 +341,30 @@ function restoreKey(k){
         localStorage.removeItem("invite_user_"+k);
         loadInviteTable();
     }
+}
+
+// --- Login attempts display ---
+function loadLoginAttempts(){
+    const attempts = JSON.parse(localStorage.getItem("login_attempts")||"[]");
+    let html = `<h3 style="text-align:center; margin-top:20px;">Login Attempts</h3>
+                <table class="adminTable">
+                    <tr><th>Username</th><th>Success</th><th>Time</th></tr>`;
+    attempts.forEach(a=>{
+        html += `<tr>
+                    <td>${a.username}</td>
+                    <td>${a.success ? "✅" : "❌"}</td>
+                    <td>${a.time}</td>
+                 </tr>`;
+    });
+    html += `</table>`;
+    
+    let panel = document.getElementById("loginAttemptsPanel");
+    if(!panel){
+        panel = document.createElement("div");
+        panel.id = "loginAttemptsPanel";
+        adminBox.appendChild(panel);
+    }
+    panel.innerHTML = html;
 }
 </script>
 </body>
