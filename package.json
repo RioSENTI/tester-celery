@@ -1,0 +1,16 @@
+{
+  "name": "celery-portal",
+  "version": "1.0.0",
+  "description": "Celery Tester Portal",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "body-parser": "^2.2.1",
+    "express": "^4.21.2",
+    "express-session": "^1.18.2",
+    "fs": "^0.0.1-security"
+  }
+}
